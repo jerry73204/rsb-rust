@@ -1,5 +1,5 @@
 [workspace]
 members = [
     "librsb-sys",
-    "librsb",
+    "rsb",
 ]
