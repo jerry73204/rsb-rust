@@ -1,26 +1,10 @@
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, Result};
 use once_cell::sync::Lazy;
 use std::{
     borrow::Cow,
     env,
     path::{Path, PathBuf},
 };
-
-static LIBRSB_PATH: Lazy<Option<PathBuf>> = Lazy::new(|| {
-    println!("cargo:rerun-if-env-changed=LIBRSB_PATH");
-    let path = env::var_os("LIBRSB_PATH")?;
-    Some(PathBuf::from(path))
-});
-static LIBRSB_LIBRARY: Lazy<Option<PathBuf>> = Lazy::new(|| {
-    println!("cargo:rerun-if-env-changed=LIBRSB_LIBRARY");
-    let path = env::var_os("LIBRSB_LIBRARY")?;
-    Some(PathBuf::from(path))
-});
-static LIBRSB_INCLUDE: Lazy<Option<PathBuf>> = Lazy::new(|| {
-    println!("cargo:rerun-if-env-changed=LIBRSB_INCLUDE");
-    let path = env::var_os("LIBRSB_INCLUDE")?;
-    Some(PathBuf::from(path))
-});
 
 fn main() -> Result<()> {
     #[cfg(not(feature = "doc-only"))]
@@ -35,7 +19,7 @@ fn main() -> Result<()> {
 
         #[cfg(not(target_os = "linux"))]
         {
-            bail!("unsupported OS");
+            anyhow::bail!("unsupported OS");
         }
     }
 
@@ -45,9 +29,9 @@ fn main() -> Result<()> {
 #[cfg(feature = "codegen")]
 mod codegen {
     use super::*;
+    use bindgen::EnumVariation;
 
-    use bindgen::{AliasVariation, EnumVariation};
-
+    #[allow(dead_code)]
     pub fn codegen() -> Result<()> {
         const BINDINGS_FILE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/src/bindings.rs");
 
@@ -71,6 +55,8 @@ mod codegen {
             .derive_hash(true)
             .allowlist_type("blas_.*")
             .allowlist_type("rsb_.*")
+            .allowlist_type("BLAS_.*")
+            .allowlist_type("RSB_.*")
             .allowlist_function("BLAS_.*")
             .allowlist_function("blas_.*")
             .allowlist_function("rsb_.*")
@@ -97,6 +83,7 @@ mod codegen {
     }
 }
 
+#[allow(dead_code)]
 fn link() -> Result<()> {
     let library_dir = probe_library_dir().ok_or_else(|| anyhow!("unable to find library dir"))?;
     println!("cargo:rustc-link-search={}", library_dir.display());
@@ -104,33 +91,50 @@ fn link() -> Result<()> {
     Ok(())
 }
 
-fn probe_include_dir() -> Option<Cow<'static, Path>> {
-    let path: Option<Cow<'_, Path>> = LIBRSB_INCLUDE
-        .as_ref()
-        .map(|path| Cow::Borrowed(path.as_ref()));
+use probe::*;
+mod probe {
+    #![allow(dead_code)]
+    use super::*;
 
-    let path = path.or_else(|| -> Option<Cow<'_, Path>> {
-        let path = LIBRSB_PATH.as_ref()?;
-        Some(Cow::Owned(path.join("include")))
+    static LIBRSB_PATH: Lazy<Option<PathBuf>> = Lazy::new(|| {
+        println!("cargo:rerun-if-env-changed=LIBRSB_PATH");
+        let path = env::var_os("LIBRSB_PATH")?;
+        Some(PathBuf::from(path))
+    });
+    static LIBRSB_LIBRARY: Lazy<Option<PathBuf>> = Lazy::new(|| {
+        println!("cargo:rerun-if-env-changed=LIBRSB_LIBRARY");
+        let path = env::var_os("LIBRSB_LIBRARY")?;
+        Some(PathBuf::from(path))
+    });
+    static LIBRSB_INCLUDE: Lazy<Option<PathBuf>> = Lazy::new(|| {
+        println!("cargo:rerun-if-env-changed=LIBRSB_INCLUDE");
+        let path = env::var_os("LIBRSB_INCLUDE")?;
+        Some(PathBuf::from(path))
     });
 
-    path.or_else(|| Some(Cow::Borrowed(Path::new("/usr/include"))))
-}
+    pub fn probe_include_dir() -> Option<Cow<'static, Path>> {
+        let path: Option<Cow<'_, Path>> = LIBRSB_INCLUDE
+            .as_ref()
+            .map(|path| Cow::Borrowed(path.as_ref()));
 
-fn probe_library_dir() -> Option<Cow<'static, Path>> {
-    let path: Option<Cow<'_, Path>> = LIBRSB_LIBRARY
-        .as_ref()
-        .map(|path| Cow::Borrowed(path.as_ref()));
+        let path = path.or_else(|| -> Option<Cow<'_, Path>> {
+            let path = LIBRSB_PATH.as_ref()?;
+            Some(Cow::Owned(path.join("include")))
+        });
 
-    let path = path.or_else(|| -> Option<Cow<'_, Path>> {
-        let path = LIBRSB_PATH.as_ref()?;
-        Some(Cow::Owned(path.join("lib")))
-    });
+        path.or_else(|| Some(Cow::Borrowed(Path::new("/usr/include"))))
+    }
 
-    path.or_else(|| Some(Cow::Borrowed(Path::new("/usr/lib"))))
-}
+    pub fn probe_library_dir() -> Option<Cow<'static, Path>> {
+        let path: Option<Cow<'_, Path>> = LIBRSB_LIBRARY
+            .as_ref()
+            .map(|path| Cow::Borrowed(path.as_ref()));
 
-struct Library {
-    pub include: Cow<'static, Path>,
-    pub library: Cow<'static, Path>,
+        let path = path.or_else(|| -> Option<Cow<'_, Path>> {
+            let path = LIBRSB_PATH.as_ref()?;
+            Some(Cow::Owned(path.join("lib")))
+        });
+
+        path.or_else(|| Some(Cow::Borrowed(Path::new("/usr/lib"))))
+    }
 }
