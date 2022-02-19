@@ -19,3 +19,6 @@ ascii = "1.0.0"
 [features]
 codegen = ["librsb-sys/codegen"]
 doc-only = ["librsb-sys/doc-only"]
+
+[package.metadata.docs.rs]
+features = ["doc-only"]
