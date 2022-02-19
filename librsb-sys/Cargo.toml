@@ -17,3 +17,6 @@ bindgen = "0.59.2"
 [features]
 codegen = ["bindgen"]
 doc-only = []
+
+[package.metadata.docs.rs]
+features = ["doc-only"]
