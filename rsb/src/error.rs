@@ -37,3 +37,12 @@ impl Display for Error {
 }
 
 impl std::error::Error for Error {}
+
+macro_rules! ensure {
+    ($cond:expr, $($args:tt)*) => {
+        if ! $cond {
+            return Err(crate::error::Error::custom(format!( $($args)* )));
+        }
+    };
+}
+pub(crate) use ensure;
